@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ピクセルモザイクメーカー</title>
+  <style>
+    :root{
+      --bg:#0b0e14;        /* 深いネイビー */
+      --panel:#111726;     /* パネルベース */
+      --panel-2:#0d1322;   /* もう少し暗い */
+      --text:#e8ecf1;      /* 文字色 */
+      --muted:#96a0b5;     /* 補助文字 */
+      --brand:#7cc7ff;     /* アクセント */
+      --accent:#88ffcc;    /* 成功色 */
+      --danger:#ff99aa;
+      --shadow: 0 20px 50px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --radius-xs: 9px;
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0; background:
+        radial-gradient(1000px 500px at 10% -10%, #1c2440 0%, transparent 60%),
+        radial-gradient(900px 400px at 110% 10%, #182034 0%, transparent 60%),
+        var(--bg);
+      color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      letter-spacing:.2px;
+    }
+    header{
+      max-width:1200px; margin:32px auto 18px; padding:14px 18px; border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow: var(--shadow);
+      display:flex; align-items:center; gap:14px; position:sticky; top:12px; z-index:30;
+      backdrop-filter: blur(8px);
+    }
+    .logo{
+      width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+      background: radial-gradient(120% 120% at 20% 10%, #7cc7ff55, transparent 60%),
+                  linear-gradient(135deg, #223055, #0e1426);
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+      font-weight:700; color:#def; letter-spacing:.6px;
+    }
+    h1{ font-size:18px; margin:0; font-weight:700; }
+    .muted{ color:var(--muted); font-size:12px; }
+
+    .toolbar{
+      margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .btn{
+      appearance:none; border:none; cursor:pointer; color:var(--text);
+      padding:10px 14px; border-radius:12px; font-weight:600; font-size:14px;
+      background: linear-gradient(180deg, #1a2442, #14203a);
+      border:1px solid rgba(124,199,255,.28);
+      box-shadow: 0 4px 16px rgba(124,199,255,.12), inset 0 1px 0 rgba(255,255,255,.06);
+      transition: transform .08s ease, filter .2s ease, box-shadow .2s ease;
+    }
+    .btn:hover{ filter:brightness(1.08); }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+    .btn.secondary{
+      background: linear-gradient(180deg, #182035, #121a2b);
+      border-color: rgba(255,255,255,.12);
+      box-shadow: 0 3px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .btn.danger{ border-color: rgba(255,153,170,.3); background: linear-gradient(180deg, #3a1520, #2a0f18); }
+    .btn.success{ border-color: rgba(136,255,204,.3); background: linear-gradient(180deg, #154232, #0d2b22); }
+
+    .slider{
+      appearance:none; width:160px; height:8px; border-radius:999px; background:#1f2a49; outline:none; cursor:pointer; position:relative;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.4), 0 0 0 1px rgba(124,199,255,.25);
+    }
+    .slider::-webkit-slider-thumb{ appearance:none; width:18px; height:18px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #fff, #cfe8ff);
+      border:1px solid #7cc7ff; box-shadow:0 2px 8px rgba(124,199,255,.55);
+    }
+
+    .container{ max-width:1200px; margin:0 auto 60px; padding:0 18px 18px; }
+    .canvas-wrap{
+      position:relative; background:linear-gradient(45deg, #1b2137 25%, #161c2f 25%, #161c2f 50%, #1b2137 50%, #1b2137 75%, #161c2f 75%, #161c2f 100%);
+      background-size:24px 24px; border-radius: var(--radius); overflow:hidden;
+      border:1px solid rgba(255,255,255,.08); box-shadow: var(--shadow);
+      min-height: 420px; display:grid; place-items:center;
+    }
+    canvas{ display:block; width:100%; height:auto; }
+
+    .uploader{
+      display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+      padding:12px 0 0; color:var(--muted);
+    }
+
+    .hint{ color:var(--muted); font-size:12px; }
+
+    /* 選択矩形の UI 表示をキャンバスに重ねるためのガイド（説明用バッジ） */
+    .badge{
+      position:absolute; right:12px; bottom:12px; background:rgba(0,0,0,.45);
+      padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+      font-size:12px; color:#d4def0; backdrop-filter: blur(6px);
+    }
+    .kbd{ display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 6px; border-radius:7px; background:#101525; border:1px solid rgba(255,255,255,.15); font-weight:700; color:#eaf4ff; }
+
+    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">PX</div>
+    <div>
+      <h1>ピクセルモザイクメーカー</h1>
+      <div class="muted">画像の一部に高品質モザイクを手早く追加。ドラッグで枠作成、角でリサイズ、移動もOK。</div>
+    </div>
+
+    <div class="toolbar" role="toolbar" aria-label="ツールバー">
+      <label class="btn secondary" for="fileInput" title="画像を開く">
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align:-3px; margin-right:8px"><path fill="currentColor" d="M19 20H5a2 2 0 0 1-2-2V8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a2 2 0 0 1-2 2M5 8v10h14V8h-3.17l-1.41-2H9.58L8.17 8z"/></svg>
+        画像を開く
+        <input id="fileInput" class="sr-only" type="file" accept="image/*" />
+      </label>
+      <button id="insertBtn" class="btn" title="中央に小さめの枠を追加">枠を生成</button>
+      <div class="btn secondary" style="display:flex; align-items:center; gap:10px;">
+        強さ <input id="mosaicRange" class="slider" type="range" min="4" max="60" value="12" />
+        <span id="mosaicValue" aria-live="polite">12px</span>
+      </div>
+      <button id="undoBtn" class="btn secondary" title="Ctrl+Z">元に戻す</button>
+      <button id="redoBtn" class="btn secondary" title="Ctrl+Y / Ctrl+Shift+Z">やり直し</button>
+      <button id="downloadBtn" class="btn success" title="PNGで保存">ダウンロード</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="canvasWrap" class="canvas-wrap">
+      <canvas id="stage" width="1000" height="600" aria-label="画像編集キャンバス"></canvas>
+      <div class="badge">
+        <div><span class="kbd">Drag</span> で選択枠作成／移動／角でリサイズ</div>
+        <div><span class="kbd">Ctrl</span> + <span class="kbd">Z</span> で元に戻す</div>
+        <div><span class="kbd">Ctrl</span> + <span class="kbd">Y</span> または <span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">Z</span> でやり直し</div>
+      </div>
+    </div>
+    <div class="uploader">
+      <div class="hint">ヒント：画像を開いたら、まずドラッグで枠を作ってみてください。枠は後から移動・拡大縮小できます。強さスライダーでモザイク粒度を変更できます。</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ====== 基本状態 ======
+  const fileInput = document.getElementById('fileInput');
+  const canvas = document.getElementById('stage');
+  const wrap = document.getElementById('canvasWrap');
+  const ctx = canvas.getContext('2d');
+  const insertBtn = document.getElementById('insertBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const mosaicRange = document.getElementById('mosaicRange');
+  const mosaicValue = document.getElementById('mosaicValue');
+
+  let img = new Image();
+  let imgLoaded = false;
+  let imgNatural = { w: 0, h: 0 };
+  let scale = 1; // image->canvas スケール
+
+  // 選択領域は「画像座標系」で保持（元解像度エクスポートが簡単）
+  /** @type {{x:number,y:number,w:number,h:number,size:number}[]} */
+  let regions = [];
+  let selectedIndex = -1;
+
+  // 履歴（Undo/Redo）
+  const history = [];
+  let historyIndex = -1;
+
+  // ドラッグ状態
+  let isPointerDown = false;
+  let dragMode = null; // 'create' | 'move' | 'resize'
+  let dragStart = { x:0, y:0 };   // 画像座標
+  let moveOffset = { x:0, y:0 };  // 画像座標（移動時）
+  let resizeCorner = null; // 'tl'|'tr'|'bl'|'br'
+
+  // ====== ユーティリティ ======
+  const cloneRegions = () => regions.map(r => ({...r}));
+  const pushHistory = () => {
+    history.splice(historyIndex + 1);
+    history.push(cloneRegions());
+    historyIndex = history.length - 1;
+    updateUndoRedoState();
+  };
+  const restoreFromHistory = (i) => {
+    if (i < 0 || i >= history.length) return;
+    historyIndex = i;
+    regions = history[i].map(r => ({...r}));
+    selectedIndex = Math.min(selectedIndex, regions.length - 1);
+    draw();
+    updateUndoRedoState();
+  };
+  const updateUndoRedoState = () => {
+    undoBtn.disabled = historyIndex <= 0;
+    redoBtn.disabled = historyIndex >= history.length - 1;
+  };
+
+  const toImageCoords = (cx, cy) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (cx - rect.left) * (canvas.width / rect.width);
+    const y = (cy - rect.top) * (canvas.height / rect.height);
+    // すでに canvas ピクセル。画像→canvas スケールが scale のため、画像座標へ戻す
+    return { x: x / scale, y: y / scale };
+  };
+  const toCanvasRect = (r) => ({ x: r.x * scale, y: r.y * scale, w: r.w * scale, h: r.h * scale });
+
+  const fitCanvasToWrap = () => {
+    if (!imgLoaded) return;
+    const maxW = wrap.clientWidth;
+    const maxH = Math.max(420, window.innerHeight * 0.55);
+    const iw = imgNatural.w, ih = imgNatural.h;
+    const ratio = Math.min(maxW / iw, maxH / ih);
+    scale = ratio;
+    canvas.width = Math.max(1, Math.round(iw * ratio));
+    canvas.height = Math.max(1, Math.round(ih * ratio));
+    draw();
+  };
+  window.addEventListener('resize', fitCanvasToWrap);
+
+  // ====== 描画 ======
+  const draw = () => {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if (!imgLoaded) {
+      // プレースホルダ
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,.06)';
+      const pad = 24;
+      ctx.fillRect(pad, pad, canvas.width - pad*2, canvas.height - pad*2);
+      ctx.restore();
+      return;
+    }
+    // 画像
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, 0, 0, imgNatural.w, imgNatural.h, 0, 0, imgNatural.w*scale, imgNatural.h*scale);
+
+    // モザイク領域
+    regions.forEach((r, idx) => drawMosaicRegion(r));
+
+    // 選択枠
+    if (selectedIndex >= 0 && regions[selectedIndex]) {
+      drawSelection(regions[selectedIndex]);
+    }
+  };
+
+  const drawMosaicRegion = (r) => {
+    const view = toCanvasRect(r);
+    const block = Math.max(2, Math.floor(r.size));
+
+    // オフスクリーンに縮小→拡大（補間なし）
+    const off = document.createElement('canvas');
+    const offx = off.getContext('2d');
+    const sw = Math.max(1, Math.floor(r.w));
+    const sh = Math.max(1, Math.floor(r.h));
+    const dw = Math.max(1, Math.floor(sw / block));
+    const dh = Math.max(1, Math.floor(sh / block));
+    off.width = dw; off.height = dh;
+    offx.imageSmoothingEnabled = false;
+    offx.drawImage(img, r.x, r.y, sw, sh, 0, 0, dw, dh);
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, dw, dh, view.x, view.y, view.w, view.h);
+    ctx.restore();
+  };
+
+  const drawSelection = (r) => {
+    const view = toCanvasRect(r);
+    ctx.save();
+    // 影付きの枠
+    ctx.strokeStyle = 'rgba(136,255,204,.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,6]);
+    ctx.strokeRect(view.x+.5, view.y+.5, view.w, view.h);
+
+    // ハンドル
+    ctx.setLineDash([]);
+    const handles = corners(view);
+    ctx.fillStyle = '#101525';
+    ctx.strokeStyle = 'rgba(136,255,204,.95)';
+    handles.forEach(p => {
+      ctx.beginPath();
+      ctx.rect(p.x-6, p.y-6, 12, 12);
+      ctx.fill();
+      ctx.stroke();
+    });
+    ctx.restore();
+  };
+
+  const corners = (rect) => [
+    {name:'tl', x: rect.x, y: rect.y},
+    {name:'tr', x: rect.x + rect.w, y: rect.y},
+    {name:'bl', x: rect.x, y: rect.y + rect.h},
+    {name:'br', x: rect.x + rect.w, y: rect.y + rect.h},
+  ];
+
+  const hitTestCorner = (mx, my, r) => {
+    const view = toCanvasRect(r);
+    const list = corners(view);
+    for (const p of list){
+      if (Math.abs(mx - p.x) <= 8 && Math.abs(my - p.y) <= 8) return p.name;
+    }
+    return null;
+  };
+
+  const pointInRect = (mx, my, r) => {
+    const v = toCanvasRect(r);
+    return mx >= v.x && mx <= v.x+v.w && my >= v.y && my <= v.y+v.h;
+  };
+
+  // ====== 入出力 ======
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      img = new Image();
+      img.onload = () => {
+        imgLoaded = true;
+        imgNatural = { w: img.naturalWidth, h: img.naturalHeight };
+        regions = []; selectedIndex = -1; history.length = 0; historyIndex = -1; updateUndoRedoState();
+        fitCanvasToWrap();
+        pushHistory(); // 空の状態を保存
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ====== 操作（枠生成／移動／リサイズ／ドラッグ作成） ======
+  const getMousePosCanvas = (evt) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (evt.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (evt.clientY - rect.top) * (canvas.height / rect.height);
+    return { x, y };
+  };
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!imgLoaded) return;
+    canvas.setPointerCapture(e.pointerId);
+    isPointerDown = true;
+    const { x:cx, y:cy } = getMousePosCanvas(e);
+    const { x, y } = { x: cx/scale, y: cy/scale };
+
+    dragStart = { x, y };
+    // 既存選択にヒット？（角→resize / 内側→move）
+    selectedIndex = regions.findIndex(r => pointInRect(cx, cy, r));
+    if (selectedIndex >= 0){
+      const r = regions[selectedIndex];
+      const corner = hitTestCorner(cx, cy, r);
+      if (corner){
+        dragMode = 'resize';
+        resizeCorner = corner;
+      }else{
+        dragMode = 'move';
+        moveOffset = { x: x - r.x, y: y - r.y };
+      }
+    } else {
+      // 新規作成
+      dragMode = 'create';
+      selectedIndex = -1;
+    }
+    draw();
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!imgLoaded) return;
+    const { x:cx, y:cy } = getMousePosCanvas(e);
+    const { x, y } = { x: cx/scale, y: cy/scale };
+
+    // カーソル形状
+    let hoveringCorner = -1;
+    for (let i=0;i<regions.length;i++){
+      const c = hitTestCorner(cx, cy, regions[i]);
+      if (c){ hoveringCorner = i; break; }
+    }
+    if (hoveringCorner !== -1) canvas.style.cursor = 'nwse-resize';
+    else if (regions.some(r => pointInRect(cx, cy, r))) canvas.style.cursor = 'move';
+    else canvas.style.cursor = 'crosshair';
+
+    if (!isPointerDown) return;
+
+    if (dragMode === 'create'){
+      const w = x - dragStart.x; const h = y - dragStart.y;
+      const rect = normalizeRect(dragStart.x, dragStart.y, w, h);
+      // 一時表示（最後に確定）
+      draw();
+      // 仮の選択を描く
+      drawSelection({ ...rect });
+    }
+    else if (dragMode === 'move' && selectedIndex >= 0){
+      const r = regions[selectedIndex];
+      r.x = clamp(x - moveOffset.x, 0, imgNatural.w - r.w);
+      r.y = clamp(y - moveOffset.y, 0, imgNatural.h - r.h);
+      draw();
+    }
+    else if (dragMode === 'resize' && selectedIndex >= 0){
+      const r = regions[selectedIndex];
+      const nx = r.x, ny = r.y, nw = r.w, nh = r.h;
+      let x1 = r.x, y1 = r.y, x2 = r.x + r.w, y2 = r.y + r.h;
+      if (resizeCorner === 'tl'){ x1 = x; y1 = y; }
+      if (resizeCorner === 'tr'){ x2 = x; y1 = y; }
+      if (resizeCorner === 'bl'){ x1 = x; y2 = y; }
+      if (resizeCorner === 'br'){ x2 = x; y2 = y; }
+      const rect = normalizeRect(x1, y1, x2-x1, y2-y1);
+      r.x = clamp(rect.x, 0, imgNatural.w - 1);
+      r.y = clamp(rect.y, 0, imgNatural.h - 1);
+      r.w = clamp(rect.w, 1, imgNatural.w - r.x);
+      r.h = clamp(rect.h, 1, imgNatural.h - r.y);
+      draw();
+    }
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    if (!imgLoaded) return; if (!isPointerDown) return;
+    isPointerDown = false; dragMode = null; resizeCorner = null;
+
+    const { x:cx, y:cy } = getMousePosCanvas(e);
+    const { x, y } = { x: cx/scale, y: cy/scale };
+
+    if (selectedIndex === -1){
+      // create 確定
+      const w = x - dragStart.x; const h = y - dragStart.y;
+      const rect = normalizeRect(dragStart.x, dragStart.y, w, h);
+      if (rect.w > 3 && rect.h > 3){
+        rect.size = Number(mosaicRange.value);
+        regions.push(rect);
+        selectedIndex = regions.length - 1;
+        pushHistory();
+      }
+      draw();
+    } else {
+      // move/resize の確定
+      pushHistory();
+    }
+  });
+
+  // ボタン：中央に枠を追加
+  insertBtn.addEventListener('click', () => {
+    if (!imgLoaded) return;
+    const iw = imgNatural.w, ih = imgNatural.h;
+    const w = Math.round(iw * 0.25), h = Math.round(ih * 0.18);
+    const r = { x: Math.round(iw*0.5 - w/2), y: Math.round(ih*0.5 - h/2), w, h, size: Number(mosaicRange.value) };
+    regions.push(r); selectedIndex = regions.length - 1; draw(); pushHistory();
+  });
+
+  // スライダー：選択中の枠の強さを更新（未選択時は新規作成時の値）
+  mosaicRange.addEventListener('input', () => {
+    mosaicValue.textContent = mosaicRange.value + 'px';
+    if (selectedIndex >= 0 && regions[selectedIndex]){
+      regions[selectedIndex].size = Number(mosaicRange.value);
+      draw();
+    }
+  });
+
+  // Undo / Redo
+  const doUndo = () => restoreFromHistory(historyIndex - 1);
+  const doRedo = () => restoreFromHistory(historyIndex + 1);
+  undoBtn.addEventListener('click', doUndo);
+  redoBtn.addEventListener('click', doRedo);
+
+  // キーボードショートカット
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z'){ e.preventDefault(); doUndo(); }
+    if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')){ e.preventDefault(); doRedo(); }
+  });
+
+  // ダウンロード（元解像度で描画し直し）
+  downloadBtn.addEventListener('click', () => {
+    if (!imgLoaded) return;
+    const out = document.createElement('canvas');
+    out.width = imgNatural.w; out.height = imgNatural.h;
+    const ox = out.getContext('2d');
+    ox.imageSmoothingEnabled = true;
+    ox.drawImage(img, 0, 0);
+
+    // 各領域にモザイク
+    regions.forEach(r => {
+      const sw = Math.max(1, Math.floor(r.w));
+      const sh = Math.max(1, Math.floor(r.h));
+      const dw = Math.max(1, Math.floor(sw / Math.max(2, Math.floor(r.size))));
+      const dh = Math.max(1, Math.floor(sh / Math.max(2, Math.floor(r.size))));
+      const off = document.createElement('canvas');
+      off.width = dw; off.height = dh;
+      const offx = off.getContext('2d');
+      offx.imageSmoothingEnabled = false;
+      offx.drawImage(img, r.x, r.y, sw, sh, 0, 0, dw, dh);
+      ox.imageSmoothingEnabled = false;
+      ox.drawImage(off, 0, 0, dw, dh, r.x, r.y, sw, sh);
+      ox.imageSmoothingEnabled = true;
+    });
+
+    const a = document.createElement('a');
+    a.download = 'mosaic.png';
+    a.href = out.toDataURL('image/png');
+    a.click();
+  });
+
+  // 便利関数
+  const normalizeRect = (x, y, w, h) => {
+    const x1 = Math.min(x, x + w), y1 = Math.min(y, y + h);
+    const x2 = Math.max(x, x + w), y2 = Math.max(y, y + h);
+    const nx1 = clamp(x1, 0, imgNatural.w-1);
+    const ny1 = clamp(y1, 0, imgNatural.h-1);
+    const nx2 = clamp(x2, 1, imgNatural.w);
+    const ny2 = clamp(y2, 1, imgNatural.h);
+    return { x: Math.round(nx1), y: Math.round(ny1), w: Math.max(1, Math.round(nx2 - nx1)), h: Math.max(1, Math.round(ny2 - ny1)) };
+  };
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+  // 初期描画
+  fitCanvasToWrap();
+})();
+</script>
+</body>
+</html>
